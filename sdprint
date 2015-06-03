@@ -1,0 +1,106 @@
+#!/usr6/aplb/Perl/bin/perl
+#--------------------------------------------------------------
+# File:    sdprint-pdfdir
+# Project: new authoring
+# Purpose: Extracts pull numbers from Supplementary Data SGML
+#          srtructure and construnts a PDF directory for print.
+#          Specific to the XEROX DocuTech system.
+# Syntax:  sdprint-pdfdir <SGML file name>
+# Author:  GVGouzev (x8418)
+# Date:    08/01/00
+#
+# Updated '$outdir' path from "/usr3" to "/usr2" and "partsb" to "partsa"
+# Date:    06/12/15 by A.Cordero (x3193)
+#---------------------------------------------------------------
+# Check for sufficient arguments, set up variables
+
+$outdir = '/usr2/partsa/tp/d238';
+$docdir = '/usr5/partsb/pub/vndrdata';
+$sdfile = $ARGV[0];	# Supp Data file argument
+$sorter = 100;		# The prefix which will sort the directory files
+undef %pullnums;	# pull number hash
+undef %pulldirs;	# pull directory hash
+
+if (@ARGV < 1) {
+print "\nUSAGE: $0 <Supplementary Data SGML file name>\n";
+exit;
+}
+else {
+print STDOUT "\n\n     CREATING PDF FILE ASSEMBLY FROM SGML \n";
+&ParseSD;
+print STDOUT "\n     RESULTING DIRECTORY: $outdir/$pdf \n\n";
+system "chmod 777 $outdir/$pdf";
+system "chmod 666 $outdir/$pdf/*.*";
+}
+
+#--------------------------------------------------------------
+# Function:     ParseSD
+# Arguments:    none
+# Description:  Reads the input file line-by-line, adding the
+#		the missing lines until the entire <pitem> is
+#		assembled. Then the pull numbers are extracted
+#		and the pull files are copied with the sorter prefix.
+# Example:	&ParseVen;
+#--------------------------------------------------------------
+
+sub ParseSD {
+local ($line, $ll, $pullno);
+if (!open (IN, $sdfile)) {
+print "\nCould not open Supplementary Data file $sdfile. Exiting...\n";
+exit 0;
+}
+
+$pdf = $sdfile;			# Construct the output directory name
+$pdf =~ s/.sgm[l]?//;
+mkdir "$outdir/$pdf", 0777;
+
+while ($line = <IN>) {
+$line =~ s/<\?[^>.]*>//;
+if ($line =~ /^<pitem/) {
+$ll = &getline($line);
+$ll =~ s/ </</g;			# remove extra spaces, left from
+$ll =~ s/> />/g;			# joining the split part lines
+if ($ll =~ /<pullno>(.*)<\/pullno>/) {
+$pullno = lc($1);
+if (! $pullnums{$pullno}) {
+my $sddir = substr("$pullno", 0, 1);
+if (! $pulldirs{$sddir} && $pullno !~ /^mp/) {
+system "cp -f $docdir/s/slip1.pdf \"$outdir/$pdf/$sorter\"_tab.pdf";	# Insert the bleed tab slip sheet
+$sorter = $sorter + 1;
+$pulldirs{$sddir} = 1;
+}
+print STDOUT "Copying: $docdir/$sddir/$pullno.pdf \n";
+system "cp -f $docdir/$sddir/$pullno.pdf \"$outdir/$pdf/$sorter\"_$pullno.pdf";
+$sorter = $sorter + 1;
+system "cp -f $docdir/s/slip1.pdf \"$outdir/$pdf/$sorter\"_slip.pdf";
+$pullnums{$pullno} = 1;		# add pull number to the hash to record its presence
+$sorter = $sorter + 1;
+}
+}
+}
+}
+close IN;
+return 0;
+}
+
+#-------------------------------------------------------
+# Function:     getline
+# Arguments:    initial line to be added to
+# Description:  Read one or more lines until next <pitem>
+#		and concatenate them.
+# Example:	$long_line = &getline($line);
+#-------------------------------------------------------
+
+sub getline {
+local($line) = @_;
+chop($line);
+$aline = '';
+while(1) {
+if ($aline =~ /[^>]$/) {$aline = join(' ', $aline, $line);}
+else {$aline = join('', $aline, $line);}
+if ($line =~ /<\/pitem>$/) {return($aline)}
+$line = <IN>;
+chop($line);
+$line =~ s/<\?Pub[^>]*>//;
+}
+}
