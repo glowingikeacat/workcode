@@ -1,0 +1,515 @@
+#!/bin/csh -f
+
+# Converts Techman SGML OMIs to HTML 4.0 by using the Jade
+# package and a custom DSSSL. The output is specifically
+# intended for cd-rom and Intranet delivery. It is placed
+# into the appropriate directory structures.
+#
+# Created by GVGouzev (505-8418)
+# Edited by Alex Cordero on July 30, 2012 to accept the Azeri code (858-292-3193)
+# Other than the inclusion of the Azeri code, nothing else was edited
+# as HTML is no longer required for languages other than English.
+# edited by Alex Cordero on February 28, 2014 to accept Polish.
+# changed to Bulgarian on 8/7/14 by Alex Cordero
+#---------------------------------------------------------------------
+# Test for validity of arguments
+
+echo ''
+
+if ($#argv < 2) then
+echo '   USAGE: sgml2cd <file name> <doc type>'
+echo ''
+echo '   file name -     the SGML file with the sales order number'
+echo '                   in the first 5 positions of its name'
+echo '   doc type  -     one of the supported document type codes:'
+echo '                   sog, imi, ipl, sd, db, stacon, ccrm, sm, pa, mbog, mbomi'
+echo '                   Mercury-specific types: og, spg, ig'
+exit 0
+endif
+
+if (! -e $argv[1]) then
+echo "   FILE $argv[1] DOES NOT EXIST. PLEASE VERIFY THE NAME AND TRY AGAIN..."
+exit 0
+endif
+
+if (`whoami` != 'artadmin') then
+echo '   YOU SHOULD BE LOGGED IN AS artadmin. PLEASE TRY AGAIN...'
+exit 0
+endif
+
+#---------------------------------------------------------------------
+# Ask for the desired language
+
+menu1_top:
+echo ''
+echo '   Language Selection Menu:'
+echo ''
+echo '  1 Czech       2 Danish    3 Dutch    4 English    5 Finnish'
+echo '  6 French      7 German    8 Greek    9 Italian    10 Norwegian'
+echo ' 11 Portuguese 12 Russian  13 Slovak  14 Spanish    15 Swedish'
+echo ' 16 Slovenian  17 Azeri    18 Polish  19 Hungarian  20 Croatian'
+echo ' 21 Bulgarian'
+echo ''
+echo -n 'Enter choice number or q to quit: '
+set lan = $<
+
+if ($lan == '1') then
+set LANG = 'cs'
+else if ($lan == '2') then
+set LANG = 'da'
+else if ($lan == '3') then
+set LANG = 'nl'
+else if ($lan == '4') then
+set LANG = 'en'
+else if ($lan == '5') then
+set LANG = 'fi'
+else if ($lan == '6') then
+set LANG = 'fr'
+else if ($lan == '7') then
+set LANG = 'de'
+else if ($lan == '8') then
+set LANG = 'el'
+else if ($lan == '9') then
+set LANG = 'it'
+else if ($lan == '10') then
+set LANG = 'no'
+else if ($lan == '11') then
+set LANG = 'pt'
+else if ($lan == '12') then
+set LANG = 'ru'
+else if ($lan == '13') then
+set LANG = 'sk'
+else if ($lan == '14') then
+set LANG = 'es'
+else if ($lan == '15') then
+set LANG = 'sv'
+else if ($lan == '16') then
+set LANG = 'sl'
+else if ($lan == '17') then
+set LANG = 'az'
+else if ($lan == '18') then
+set LANG = 'pl'
+else if ($lan == '19') then
+set LANG = 'hu'
+else if ($lan == '20') then
+set LANG = 'cr'
+else if ($lan == '21') then
+set LANG = 'bg'
+else if ($lan == 'q') then
+echo 'BYE...'
+exit 0
+else
+echo 'YOU HAVE ENTERED A BAD CHOICE, PLEASE TRY AGAIN...'
+goto menu1_top
+endif
+
+#----------------------------------------------------------------------
+# If everything is right, set up variables and make output directories
+
+setenv SP_CHARSET_FIXED 1
+setenv SP_ENCODING xml
+setenv CGM2PS_PATH /usr6/aplb/epic43/cgmfonts
+set root = '/usr5/partsb/pub/pub-lib'
+set base = '/usr5/partsb/pub/pub-lib/cd-rom'
+set lib  = '/usr6/aplb/adept-apps/bin/lib'
+set art  = '/usr5/partsb/pub/art-lib'
+set ati  = '/usr6/aplb/epic43/custom'
+set apps = '/usr6/aplb/adept-apps'
+set dq   = '"'
+
+# set sonumber=`echo $argv[1] | tr -d "[a-z._]"`
+set sonumber=`echo $argv[1] | cut -c1-5`
+set dirname=`echo $argv[1] | cut -c 1`
+
+if ($LANG != 'en') then
+set sonumber="$sonumber$LANG"
+endif
+
+if (! -e $root/$dirname) then
+mkdir -m 777 $root/$dirname
+echo "CREATED OUTPUT DIRECTORY $root/$dirname"
+endif
+
+if (! -e $root/$dirname/$sonumber) then
+mkdir -m 777 $root/$dirname/$sonumber
+mkdir -m 777 $root/$dirname/$sonumber/images
+echo "CREATED OUTPUT DIRECTORY $root/$dirname/$sonumber"
+endif
+
+if (! -e $base/$sonumber) then
+mkdir -m 777 $base/$sonumber
+mkdir -m 777 $base/$sonumber/art
+mkdir -m 777 $base/$sonumber/vdata
+mkdir -m 777 $base/$sonumber/backup
+mkdir -m 777 $base/$sonumber/images
+mkdir -m 777 $base/$sonumber/pdf
+echo "CREATED cd-rom DIRECTORY $base/$sonumber AND ITS SUBDIRECTORIES"
+endif
+
+if (! -e $base/working/$sonumber) then
+mkdir -m 777 $base/working/$sonumber
+mkdir -m 777 $base/working/$sonumber/images
+echo "CREATED QC DIRECTORY $base/working/$sonumber"
+endif
+
+#----------------------------------------------------------------------
+# Create the document type-specific frame set file from templates
+
+if ($argv[2] == 'sd') then
+set volname = 'sd'
+set basename="$sonumber$volname"
+else if ($argv[2] == 'sog') then
+set volname = 'sog'
+set basename="$sonumber$volname"
+cat $base/templates/$LANG/sog.htm | sed "s/VOLNAME/$volname/" | sed "s/BASENAME/$basename/" >! $root/$dirname/$sonumber/sog.htm
+cp $root/$dirname/$sonumber/sog.htm $base/$sonumber/sog.htm
+cp $root/$dirname/$sonumber/sog.htm $base/working/$sonumber/sog.htm
+else if ($argv[2] == 'imi') then
+set volname = 'imi'
+set basename="$sonumber$volname"
+cat $base/templates/$LANG/imi.htm | sed "s/VOLNAME/$volname/" | sed "s/BASENAME/$basename/" >! $root/$dirname/$sonumber/imi.htm
+cp $root/$dirname/$sonumber/imi.htm $base/$sonumber/imi.htm
+cp $root/$dirname/$sonumber/imi.htm $base/working/$sonumber/imi.htm
+else if ($argv[2] == 'og' || $argv[2] == 'mbog') then
+set volname = 'og'
+set basename="$sonumber$volname"
+cat $base/templates/$LANG/og.htm | sed "s/VOLNAME/$volname/" | sed "s/BASENAME/$basename/" >! $root/$dirname/$sonumber/og.htm
+cp $root/$dirname/$sonumber/og.htm $base/$sonumber/og.htm
+cp $root/$dirname/$sonumber/og.htm $base/working/$sonumber/og.htm
+else if ($argv[2] == 'spg') then
+set volname = 'spg'
+set basename="$sonumber$volname"
+cat $base/templates/$LANG/spg.htm | sed "s/VOLNAME/$volname/" | sed "s/BASENAME/$basename/" >! $root/$dirname/$sonumber/spg.htm
+cp $root/$dirname/$sonumber/spg.htm $base/$sonumber/spg.htm
+cp $root/$dirname/$sonumber/spg.htm $base/working/$sonumber/spg.htm
+else if ($argv[2] == 'ig') then
+set volname = 'ig'
+set basename="$sonumber$volname"
+cat $base/templates/$LANG/ig.htm | sed "s/VOLNAME/$volname/" | sed "s/BASENAME/$basename/" >! $root/$dirname/$sonumber/ig.htm
+cp $root/$dirname/$sonumber/ig.htm $base/$sonumber/ig.htm
+cp $root/$dirname/$sonumber/ig.htm $base/working/$sonumber/ig.htm
+else if ($argv[2] == 'ipl') then
+set volname = 'ipl'
+set basename="$sonumber$volname"
+cat $base/templates/$LANG/ipl.htm | sed "s/VOLNAME/$volname/" | sed "s/BASENAME/$basename/" >! $root/$dirname/$sonumber/ipl.htm
+cp $root/$dirname/$sonumber/ipl.htm $base/$sonumber/ipl.htm
+cp $root/$dirname/$sonumber/ipl.htm $base/working/$sonumber/ipl.htm
+else if ($argv[2] == 'db') then
+set volname = 'db'
+set basename="$sonumber$volname"
+cat $base/templates/$LANG/db.htm | sed "s/VOLNAME/$volname/" | sed "s/BASENAME/$basename/" >! $root/$dirname/$sonumber/db.htm
+cp $root/$dirname/$sonumber/db.htm $base/$sonumber/db.htm
+cp $root/$dirname/$sonumber/db.htm $base/working/$sonumber/db.htm
+else if ($argv[2] == 'pcm') then
+set volname = 'pcm'
+set basename="$sonumber$volname"
+cat $base/templates/$LANG/pcm.htm | sed "s/VOLNAME/$volname/" | sed "s/BASENAME/$basename/" >! $root/$dirname/$sonumber/pcm.htm
+cp $root/$dirname/$sonumber/pcm.htm $base/$sonumber/pcm.htm
+cp $root/$dirname/$sonumber/pcm.htm $base/working/$sonumber/pcm.htm
+else if ($argv[2] == 'ccrm') then
+set volname = 'ccrm'
+set basename="$sonumber$volname"
+cat $base/templates/$LANG/ccrm.htm | sed "s/VOLNAME/$volname/" | sed "s/BASENAME/$basename/" >! $root/$dirname/$sonumber/ccrm.htm
+cp $root/$dirname/$sonumber/ccrm.htm $base/$sonumber/ccrm.htm
+cp $root/$dirname/$sonumber/ccrm.htm $base/working/$sonumber/ccrm.htm
+else if ($argv[2] == 'stacon') then
+set volname = 'stacon'
+set basename="$sonumber$volname"
+cat $base/templates/$LANG/stacon.htm | sed "s/VOLNAME/$volname/" | sed "s/BASENAME/$basename/" >! $root/$dirname/$sonumber/stacon.htm
+cp $root/$dirname/$sonumber/stacon.htm $base/$sonumber/stacon.htm
+cp $root/$dirname/$sonumber/stacon.htm $base/working/$sonumber/stacon.htm
+else if ($argv[2] == 'mbomi') then
+set volname = 'omi'
+set basename="$sonumber$volname"
+cat $base/templates/$LANG/mbomi.htm | sed "s/VOLNAME/$volname/" | sed "s/BASENAME/$basename/" >! $root/$dirname/$sonumber/omi.htm
+cp $root/$dirname/$sonumber/omi.htm $base/$sonumber/omi.htm
+cp $root/$dirname/$sonumber/omi.htm $base/working/$sonumber/omi.htm
+else if ($argv[2] == 'sm') then
+set volname = 'sm'
+set basename="$sonumber$volname"
+cat $base/templates/$LANG/sm.htm | sed "s/VOLNAME/$volname/" | sed "s/BASENAME/$basename/" >! $root/$dirname/$sonumber/sm.htm
+cp $root/$dirname/$sonumber/sm.htm $base/$sonumber/sm.htm
+cp $root/$dirname/$sonumber/sm.htm $base/working/$sonumber/sm.htm
+else if ($argv[2] == 'pa') then
+set volname = 'pa'
+set basename="$sonumber$volname"
+else
+echo '    YOU HAVE SPECIFIED A WRONG DOCUMENT TYPE. VALID TYPES ARE:'
+echo '            sog, imi, ipl, sd, db, pcm, stacon, ccrm, sm, og, spg, ig, mbog, mbomi'
+echo '    PLEASE TRY AGAIN...'
+exit 0
+endif
+
+#----------------------------------------------------------------------
+# Copy the invariable files and templates, unless they already exist
+
+cp $argv[1] $base/$sonumber/backup/$basename.sgm && chmod 666 $base/$sonumber/backup/$basename.sgm
+
+# Revlogo is first, because it is needed for all deliveries
+if (! -e $base/$sonumber/revlogo.gif) then
+cp $base/templates/revlogo.gif $base/$sonumber
+cp $base/templates/revlogo.gif $base/working/$sonumber
+endif
+
+if (! -e $base/$sonumber/main.htm) then
+echo '     COPYING cd-rom TEMPLATES...'
+if ($argv[2] == 'sog' || $argv[2] == 'imi' || $argv[2] == 'ipl') then
+cp $base/templates/$LANG/main_omi.htm $base/$sonumber/main.htm
+cp $base/templates/$LANG/front_omi.htm $base/$sonumber
+cp $base/templates/$LANG/menubar_omi.htm $base/$sonumber
+else if ($argv[2] == 'og' || $argv[2] == 'spg' || $argv[2] == 'ig') then
+cp $base/templates/$LANG/main_m1.htm $base/$sonumber/main.htm
+cp $base/templates/$LANG/front_m1.htm $base/$sonumber
+cp $base/templates/$LANG/menubar_m1.htm $base/$sonumber
+else if ($argv[2] == 'db') then
+cp $base/templates/$LANG/main_db.htm $base/$sonumber/main.htm
+cp $base/templates/$LANG/front_db.htm $base/$sonumber
+cp $base/templates/$LANG/menubar_db.htm $base/$sonumber
+else if ($argv[2] == 'pcm') then
+cp $base/templates/$LANG/main_pcm.htm $base/$sonumber/main.htm
+cp $base/templates/$LANG/front_pcm.htm $base/$sonumber
+cp $base/templates/$LANG/menubar_pcm.htm $base/$sonumber
+else if ($argv[2] == 'ccrm') then
+cp $base/templates/$LANG/main_ccrm.htm $base/$sonumber/main.htm
+cp $base/templates/$LANG/front_ccrm.htm $base/$sonumber
+cp $base/templates/$LANG/menubar_ccrm.htm $base/$sonumber
+else if ($argv[2] == 'stacon') then
+cp $base/templates/$LANG/main_stacon.htm $base/$sonumber/main.htm
+cp $base/templates/$LANG/front_stacon.htm $base/$sonumber
+cp $base/templates/$LANG/menubar_stacon.htm $base/$sonumber
+else if ($argv[2] == 'mbog' || $argv[2] == 'mbomi') then
+cp $base/templates/$LANG/main_mab.htm $base/$sonumber/main.htm
+cp $base/templates/$LANG/front_mab.htm $base/$sonumber
+cp $base/templates/$LANG/menubar_mab.htm $base/$sonumber
+else if ($argv[2] == 'pa') then
+cp $base/templates/$LANG/main_pa.htm $base/$sonumber/main.htm
+cp $base/templates/$LANG/front_pa.htm $base/$sonumber
+
+cp $base/templates/$LANG/menubar_pa.htm $base/$sonumber
+
+cp $base/templates/$LANG/pa.htm $base/$sonumber
+cat $base/$sonumber/pa.htm | sed "s/VOLNAME/$volname/" | sed "s/BASENAME/$basename/" >! $base/$sonumber/pa.htm
+
+else if ($argv[2] == 'sm') then
+cp $base/templates/$LANG/main_sm.htm $base/$sonumber/main.htm
+cp $base/templates/$LANG/front_sm.htm $base/$sonumber
+cp $base/templates/$LANG/menubar_sm.htm $base/$sonumber
+endif
+
+cp $base/$sonumber/main.htm $base/working/$sonumber
+cp $base/$sonumber/front*.htm $base/working/$sonumber
+cp $base/$sonumber/menubar*.htm $base/working/$sonumber
+endif
+
+if (! -e $base/$sonumber/readme.htm) then
+cp $base/templates/$LANG/readme.htm $base/$sonumber
+cp $base/templates/$LANG/readme.htm $base/working/$sonumber
+endif
+
+# These are the Java expandable menu images:
+if (! -e $base/$sonumber/images/closed.gif) then
+cp $base/templates/images/*.* $base/$sonumber/images
+chmod 666 $base/working/$sonumber/images/*.*
+endif
+
+if (! -e $base/working/$sonumber/images/closed.gif) then
+cp $base/templates/images/*.* $base/working/$sonumber/images
+chmod 666 $base/working/$sonumber/images/*
+endif
+
+if (! -e $root/$dirname/$sonumber/images/closed.gif) then
+cp $base/templates/images/*.*  $root/$dirname/$sonumber/images
+chmod 666 $root/$dirname/$sonumber/images/*
+endif
+
+#-----------------------------------------------------------------------
+# Generate the art list and convert artfiles to PDF where necessary. Note
+# that the foreign graphics receive different file names so that they don't
+# overwright the English PDF.
+
+if ($argv[2] != 'sd') then
+echo 'Verifying art inventory...'
+
+# TIFF images with .pgX extention
+foreach image (`grep '<graphic filename=".*\.pg.*' $argv[1] | awk -F$dq '{print $2}'`)
+set imagelang=`echo $image | awk -F\. '{print $2}'`
+set imagecore=`echo $image | awk -F\. '{print $1}'`
+set pathdepth=`echo $imagecore | grep -c '[a-z0-9]/[a-z0-9]'`
+if ($pathdepth == 0) then
+set imagedir=`echo $imagecore | cut -c 1`
+set imagebase="$imagedir/$imagecore"
+set image="$imagedir/$image"
+else
+set imagebase="$imagecore"
+endif
+
+
+if ($imagelang == 'pg' && -e $art/$imagebase.jpg) then
+cp $art/$imagebase.jpg $base/$sonumber/art
+echo "JPEG file found: $imagebase.jpg"
+else if ($imagelang == 'pg') then
+if (! -e $art/$imagebase.pdf) then
+echo "   Converting to PDF:  $art/$image"
+bm2eps $art/$image >! /tmp/bm2eps.tmp
+distill -compatlevel 3.0 -pairs /tmp/bm2eps.tmp $art/$imagebase.pdf && /bin/rm -f /tmp/bm2eps.tmp
+cp $art/$imagebase.pdf $base/$sonumber/art
+echo "   Resulting PDF file: $art/$imagebase.pdf"
+echo ''
+else if (! -e $base/$sonumber/art/$imagebase.pdf) then
+cp $art/$imagebase.pdf $base/$sonumber/art
+endif
+else
+if (! -e $art/$image.pdf) then
+echo "   Converting to PDF:  $art/$image"
+bm2eps $art/$image >! /tmp/bm2eps.tmp
+distill -compatlevel 3.0 -pairs /tmp/bm2eps.tmp $art/$image.pdf && /bin/rm -f /tmp/bm2eps.tmp
+cp $art/$image.pdf $base/$sonumber/art
+echo "   Resulting PDF file: $art/$image.pdf"
+echo ''
+else if (! -e $base/$sonumber/art/$image.pdf) then
+cp $art/$image.pdf $base/$sonumber/art
+endif
+endif
+end
+
+# TIFF images with .tif extention
+foreach image (`grep '<graphic filename=".*\.tif' $argv[1] | awk -F$dq '{print $2}'`)
+set imagelang=`echo $image | awk -F\. '{print $2}'`
+set imagecore=`echo $image | awk -F\. '{print $1}'`
+set pathdepth=`echo $imagecore | grep -c '[a-z0-9]/[a-z0-9]'`
+if ($pathdepth == 0) then
+set imagedir=`echo $imagecore | cut -c 1`
+set imagebase="$imagedir/$imagecore"
+set image="$imagedir/$image"
+else
+set imagebase="$imagecore"
+endif
+
+
+if (-e $art/$imagebase.jpg) then
+cp $art/$imagebase.jpg $base/$sonumber/art
+echo "JPEG file found: $imagebase.jpg"
+else
+if (! -e $art/$imagebase.pdf) then
+echo "   Converting to PDF:  $art/$image"
+bm2eps $art/$image >! /tmp/bm2eps.tmp
+distill -compatlevel 3.0 -pairs /tmp/bm2eps.tmp $art/$imagebase.pdf && /bin/rm -f /tmp/bm2eps.tmp
+cp $art/$imagebase.pdf $base/$sonumber/art
+echo "   Resulting PDF file: $art/$imagebase.pdf"
+echo ''
+else if (! -e $base/$sonumber/art/$imagebase.pdf) then
+cp $art/$imagebase.pdf $base/$sonumber/art
+endif
+endif
+end
+
+# CGM files have a fixed extention
+foreach image (`grep '<graphic filename=".*\.cgm' $argv[1] | awk -F$dq '{print $2}'`)
+set imagecore=`echo $image | awk -F\. '{print $1}'`
+set pathdepth=`echo $imagecore | grep -c '[a-z0-9]/[a-z0-9]'`
+if ($pathdepth == 0) then
+set imagedir=`echo $imagecore | cut -c 1`
+set imagebase="$imagedir/$imagecore"
+set image="$imagedir/$image"
+else
+set imagebase="$imagecore"
+endif
+
+if (-e $art/$imagebase.jpg) then
+cp $art/$imagebase.jpg $base/$sonumber/art
+echo "JPEG file found: $imagebase.jpg"
+else if (! -e $art/$imagebase.pdf) then
+echo "     CONVERTING TO PDF:  $art/$image"
+cgm2ps $art/$image >! /tmp/cgm2eps.tmp
+distill -compatlevel 3.0 -pairs /tmp/cgm2eps.tmp $art/$imagebase.pdf && /bin/rm -f /tmp/cgm2eps.tmp
+cp $art/$imagebase.pdf $base/$sonumber/art
+echo "     RESULTING PDF FILE: $art/$imagebase.pdf"
+echo ''
+else if (! -e $base/$sonumber/art/$imagebase.pdf) then
+cp $art/$imagebase.pdf $base/$sonumber/art
+endif
+end
+
+# Copy the JPEGs, if any
+foreach image (`grep -i '<graphic filename=".*\.jpg' $argv[1] | awk -F$dq '{print $2}'`)
+set pathdepth=`echo $image | grep -c '[a-z0-9]/[a-z0-9]'`
+if ($pathdepth == 0) then
+set imagedir=`echo $image | cut -c 1`
+set image="$imagedir/$image"
+endif
+cp $art/$image $base/$sonumber/art
+end
+
+chmod 666 $base/$sonumber/art/*.*
+endif
+
+#-----------------------------------------------------------------------
+# Skip TOC and template modification for Vol. 3
+
+if ($argv[2] == 'sd') then
+
+# Apply the SED filter to adjust the special characters and some IPL stuff
+echo ''
+echo '     ADJUSTING SPECIAL CHARACTERS AND ENTITIES...'
+cat $argv[1] | sed -f $lib/sgml2web.sed >! /tmp/$argv[1]
+
+# Run the Jade package with the custom DSSSL
+echo '     RUNNING THE CONVERSION ENGINE...'
+jade -E 1000 -c $ati/catalog.dsssl -d $apps/dsssl/web/techman.dsl -t sgml /tmp/$argv[1] | sed 's|</HTML$|</HTML>|' >! $root/$dirname/$sonumber/sd.htm
+cat $root/$dirname/$sonumber/sd.htm | sed 's|/pub/vndrdata/.|vdata|g' >! $base/$sonumber/sd.htm
+cp $root/$dirname/$sonumber/sd.htm $base/working/$sonumber
+echo "     RESULTING FILE: $root/$dirname/$sonumber/sd.htm"
+
+# Copy the PDF vendor data files
+echo 'Copying Vendor Data PDF files. Please wait...'
+foreach f (`grep '/pub/vndrdata' $root/$dirname/$sonumber/sd.htm | sed 's|HREF="/pub/vndrdata|/usr5/partsb/pub/vndrdata|'`)
+cp `echo $f | tr -d '"'` $base/$sonumber/vdata
+end
+chmod 666 $base/$sonumber/vdata/*.*
+else
+
+# Table of Contents is first generated for CD and then copied for Intranet
+echo '     GENERATING TABLE OF CONTENTS...'
+cat $argv[1] | sed -f $lib/sgml2web.sed >! /tmp/$argv[1]
+jade -E 1000 -c $ati/catalog.dsssl -d $apps/dsssl/web/techman2toc.dsl -t sgml /tmp/$argv[1] | grep '^dbAdd' >! /tmp/java_toc.db
+cat /usr5/partsb/pub/pub-lib/cd-rom/templates/$LANG/java_toc.htm | sed -e '/\/\/DATABASE OF LINKS/ r /tmp/java_toc.db' >! /tmp/"$volname"_toc.htm
+cat /tmp/"$volname"_toc.htm | sed 's|</HTML$|</HTML>|' | sed -e "/^dbAdd/ s/#/$basename\.htm#/g" >! $base/$sonumber/"$volname"_toc.htm
+cp $base/$sonumber/"$volname"_toc.htm $root/$dirname/$sonumber/"$volname"_toc.htm
+cp $root/$dirname/$sonumber/"$volname"_toc.htm $base/working/$sonumber
+
+# Apply the SED filter to adjust the special characters and normalize the IPL tagging
+echo ''
+echo '     ADJUSTING SPECIAL CHARACTERS AND ENTITIES...'
+cat $argv[1] | sed -f $lib/sgml2web.sed >! /tmp/$argv[1]
+
+# Run the Jade package with the custom DSSSL
+echo '     RUNNING THE CONVERSION ENGINE...'
+jade -E 1000 -c $ati/catalog.dsssl -d $apps/dsssl/web/techman.dsl -t sgml /tmp/$argv[1] | sed 's|</HTML$|</HTML>|' >! $root/$dirname/$sonumber/$basename.htm
+cat $root/$dirname/$sonumber/$basename.htm | sed 's|/pub/art-lib/.|art|g' | sed 's|/pub/vndrdata/.|vdata|g' | sed 's|/pub/eref-lib/.|vdata|g'>! $base/$sonumber/$basename.htm
+cp $root/$dirname/$sonumber/$basename.htm $base/working/$sonumber
+echo "     RESULTING FILE: $root/$dirname/$sonumber/$basename.htm"
+
+# Copy the external reference PDF data files (EREF tag)
+echo 'Copying linked PDF files. Please wait...'
+foreach f (`grep '="/pub/eref-lib' $root/$dirname/$sonumber/$basename.htm | sed 's|HREF="/pub/|/usr5/partsb/pub/|'`)
+cp `echo $f | tr -d '"'` $base/$sonumber/vdata
+end
+
+# Copy the external PDF vendor data files (VREF tag)
+echo 'Copying linked vendor files. Please wait...'
+foreach f (`grep '="/pub/vndrdata' $root/$dirname/$sonumber/$basename.htm | sed 's|HREF="/pub/|/usr5/partsb/pub/|'`)
+cp `echo $f | tr -d '"'` $base/$sonumber/vdata
+end
+chmod 666 $base/$sonumber/vdata/*.*
+
+endif
+
+#------------------------------------------------------------
+# Clean up and exit
+
+chmod 666 $base/$sonumber/*.*
+chmod 666 $base/working/$sonumber/*.*
+chmod 666 $root/$dirname/$sonumber/*.*
+
+/bin/rm -f /tmp/$argv[1] /tmp/java_toc.db /tmp/"$volname"_toc.htm
+exit 0
