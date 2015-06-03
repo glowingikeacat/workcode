@@ -11,6 +11,7 @@
 #
 # Updated '$outdir' path from "/usr3" to "/usr2" and "partsb" to "partsa"
 # Date:    06/12/15 by A.Cordero (x3193)
+# This may be the last change in a long time.
 #---------------------------------------------------------------
 # Check for sufficient arguments, set up variables
 
