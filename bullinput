@@ -1,0 +1,306 @@
+#!/usr2/apl/Perl/bin/perl
+#--------------------------------------------------------------
+# File:    bullinput
+# Project: new authoring
+# Purpose: Derives identifying information about a bulletin
+#          from the SGML structure of its header.
+# Syntax:  bullinput <bulletin file name>
+# Author:  GVGouzev (x8418)
+# Date:    02/03/99
+#---------------------------------------------------------------
+# Check for sufficient arguments, set up variables
+
+require '/usr2/apl/iplanet/servers/cgi-bin/cgi-lib.pl';
+$manbase = '/usr5/partsb/pub/pub-lib/csc';
+$dbfile  = '/usr2/apl/iplanet/servers/cgi-bin/tid/bulletins.txt';
+$dbtemp  = '/usr2/apl/iplanet/servers/cgi-bin/tid/bulletins.bkp';
+$artfile = '/usr2/apl/iplanet/servers/cgi-bin/tid/techart.txt';
+$arttemp = '/usr2/apl/iplanet/servers/cgi-bin/tid/techart.bkp';
+
+if (&ReadParse(*input)) {
+$| = 1;
+print STDOUT "Content-type: text/html\n\n",
+'<HTML><HEAD><TITLE>TECHNICAL BULLETIN LIBRARY MAINTENANCE</TITLE></HEAD><BODY BGCOLOR="#FFFFFF">', "\n";
+
+if    ($input{'type'} eq 'Product Advisory') {$type = 'pa';}
+elsif ($input{'type'} eq 'Service Bulletin') {$type = 'sb';}
+elsif ($input{'type'} eq 'Technical Letter') {$type = 'tl';}
+elsif ($input{'type'} eq 'Other') {
+print STDOUT '<CENTER><B>PLEASE SELECT A TRUE BULLETIN TYPE AND TRY AGAIN...</B></CENTER></BODY></HTML>';
+exit 0;
+}
+
+if ($input{'fname'}) {
+if ($input{'fname'} =~ /[\&\;\'\`\\\"\|\*\~\>\<\]\^\[\}\{\$\n\r]/) {exit print &PrintHeader, '<CENTER><B>BAD FILE NAME!</B></CENTER>';}
+$input{'fname'} =~ tr/A-Z/a-z/;
+$input{'fname'} =~ s/[\s\n]*//g;
+if ($input{'fname'} !~ /\.sgm$/) {die "<P><B>File $input{'fname'} is not an SGML file...</B></P></BODY></HTML>";}
+$core = $input{'fname'};	# core number without the extension
+$core =~ s/\.sgm.*$//;
+$bnbr = $core;			# bulletin number without any revision
+$bnbr =~ s/[a-z]?$//;
+# bulletin groups:
+@groups = split(/-/, $input{'fname'});
+if   ($groups[0] =~ /^[1-9]$/) {$group = '0' . "$groups[0]";}
+else {$group = $groups[0];}
+
+# Weed out any old bulletins with the same number, since only the latest is allowed
+flock("$dbtemp", 2);
+open(X1, "<$dbtemp");
+open(X2, ">/tmp/sbul.tmp");
+while (<X1>) {if ($_ !~ "$type.*$group/$bnbr") {print X2 $_;}}
+close X1;
+close X2;
+&CopyFile("/tmp/sbul.tmp","$dbtemp");
+flock("$dbtemp", 8);
+unlink("/tmp/sbul.tmp");
+
+if (! open(IN, "$manbase/$type/$group/$input{'fname'}")) {
+print STDOUT "<CENTER><B>COULD NOT OPEN THE INPUT FILE $manbase/$type/$group/$input{'fname'}. PLEASE TRY AGAIN.</B></CENTER>";
+} else {
+open(TMP, ">>$dbtemp");
+&ParseFile;
+close IN;
+close TMP;
+&GetArt("$manbase/$type/$group/$input{'fname'}");
+print "<P><B> Added $input{'type'} $input{'fname'} to the buffer...</B></P>\n",
+'<P><B> YOU MUST SAVE THE CHANGES TO ENACT THESE ADDITIONS OR ROLL BACK TO ESCAPE THIS EDIT</B></P>';
+}
+}
+
+elsif ($input{'save'}) {
+system "/bin/sort -u -o $dbtemp $dbtemp";		# Bulletin Index
+system "/bin/sort -u -o $arttemp -d $arttemp";		# Tech Art Index
+&CopyFile($dbtemp, '/usr5/partsb/pub/d238/trans/homepage/bulletins.txt');
+if (&CopyFile($dbtemp, $dbfile) && &CopyFile($arttemp, $artfile)) {print STDOUT '<CENTER><B>DATABASE SUCCESSFULLY UPDATED AND SAVED...</B></CENTER>';}
+}
+
+elsif ($input{'rollback'}) {
+if (&CopyFile($dbfile, $dbtemp) && &CopyFile($artfile, $arttemp)) {print STDOUT '<CENTER><B>ROLLED BACK THE DATABASE SUCCESSFULLY ...</B></CENTER>';}
+}
+
+else {print STDOUT '<CENTER><B>YOU HAVE SUBMITTED INSUFFICIENT DATA. PLEASE TRY AGAIN...</B></CENTER>';}
+print STDOUT '<HR SIZE="1"><CENTER>[<A HREF="javascript:history.go(-1)">Back</A>] ', "\n",
+'[<A HREF="https://solarweb.solar.cat.com/">Solar Home</A>] ', "\n",
+'[<A HREF="https://solarweb2.solar.cat.com/pso/index.html">PSO Home</A>]<BR>', "\n",
+'<A HREF="https://solarweb.solar.cat.com/corp/legal-notices.htm"><SMALL>Copyright ¨ Solar Turbines Incorporated.á', "\n",
+'All rights reserved.</SMALL></A></CENTER></BODY></HTML>';
+exit 0;
+} else {
+print STDOUT &PrintHeader, '<CENTER><B>INPUT COULD NOT BE PARSED!</B></CENTER></BODY></HTML>';
+exit 0;
+}
+
+#--------------------------------------------------------------
+# Function:     ParseFile
+# Arguments:    none
+# Description:  Reads the input file line-by-line, matching the
+#               lines for specific information to extract.
+# Example:      &ParseFile;
+#--------------------------------------------------------------
+
+sub ParseFile {
+local ($line, $lcount);
+while ($line = <IN>) {
+$lcount++;			# We read another line
+$line = &getline($line);	# Get the rest of the line
+$line =~ s/<\?Pub[^>]*>//g;	# Clean the line from possible junk
+$line =~ s/ </</g;
+$line =~ s/> />/g;
+SWITCH: {
+if ($line =~ /<bulnbr>(.*)<\/bulnbr>/i) {if ($1) {print TMP $type, '|', $1, '|';} else {print TMP $type, '|','--|';} last SWITCH;}
+if ($line =~ /<issdate>(.*)<\/issdate>/i) {if ($1) {print TMP $1, '|';} else {print TMP '--|';} last SWITCH;}
+if ($line =~ /<revdate>(.*)<\/revdate>/i) {if ($1) {print TMP $1, '|';} else {print TMP 'N/A|';} last SWITCH;}
+if ($line =~ /<bulprod>(.*)<\/bulprod>/i) {if ($1) {print TMP $1, '|';} else {print TMP 'N/A|';} last SWITCH;}
+if ($line =~ /<bulmodel>(.*)<\/bulmodel>/i) {if ($1) {print TMP $1, '|';} else {print TMP 'N/A|';} last SWITCH;}
+if ($line =~ /<bulsubj safety=\".\">(.*)<\/bulsubj>/i) {if ($1) {print TMP $1, "|";} else {print TMP 'N/A|';} last SWITCH;}
+if ($line =~ /<bulsubj>(.*)<\/bulsubj>/i) {if ($1) {print TMP $1, "|";} else {print TMP 'N/A|';} last SWITCH;} # If attribute ommitted
+if ($line =~ /<bultype>(.*)<\/bultype>/i) {if ($1) {print TMP $1, '|';} else {print TMP 'N/A|';} last SWITCH;}
+if ($line =~ /<bulcomp>(.*)<\/bulcomp>/i) {if ($1) {print TMP $1, '|', "$group/$core|", &today, "\n";} else {print TMP "N/A|$group/$core|", &today, "\n";} return;}
+}
+if ($type eq "sb" && $lcount > 70) {print TMP "|$group/$core|", &today, "\n"; return;}		# Quit at 70 lines for long files
+if ($type eq "tl" && $lcount > 70) {print TMP "N/A|N/A|$group/$core|", &today, "\n"; return;}	# Letters don't have the last 2 tags
+}
+if ($type eq "sb") {print TMP "|$group/$core|", &today, "\n";}		# If <bulcomp> is not the last tag, terminate the line if EOF reaced
+if ($type eq "tl") {print TMP "N/A|N/A|$group/$core|", &today, "\n";}	# Letters don't have the last 2 tags, hence the fillup
+return;
+}
+
+#--------------------------------------------------------------
+# Function:     GetArt
+# Arguments:    none
+# Description:  Reads the input file line-by-line, adding the
+#               the missing lines until the entire <figure> is
+#               assembled. Then the art number(s) and title are
+#               extracted, cleaned and passed into the next step.
+# Example:      &GetArt($file);
+#--------------------------------------------------------------
+
+sub GetArt {
+local ($infile) = @_;
+local ($line, $ll, $artfile, $engine, $applic);
+
+open(IN,"<$infile") || die("Cannot open $infile: $! \n");
+open(TMP, ">>$arttemp") || die("Cannot open $arttemp: $! \n");
+flock($arttemp, 2);            # Lock the file for heavy usage
+
+while ($line = <IN>) {
+my $entry = "";
+my $title = "";
+$line =~ s/<\?[^>.]*>//;
+
+if ($line =~ /<bulprod>(.*)<\/bulprod>/i) {if ($1) {$engine = $1;} next;}
+if ($line =~ /<bulmodel>(.*)<\/bulmodel>/i) {if ($1) {$applic = $1;} next;}
+
+if ($line =~ /<figure/i || $line =~ /<iplart/i) {
+$ll = &getgraphic($line);
+if ($ll =~ /<title>(.*)<\/title>/i) {
+$title = $1;
+$title =~ s/  / /g;             # reduce double spaces to one
+$title =~ s/subscrpt>/sub>/ig;  # Below are all SGML-to-HTML transformations
+$title =~ s/supscrpt>/sup>/ig;
+$title =~ s/verbatim>/pre>/ig;
+$title =~ s/<emph type="bold">(.*)<\/emph>/<b>$1<\/b>/ig;
+$title =~ s/<emph type="ul">(.*)<\/emph>/<u>$1<\/u>/ig;
+$title =~ s/<emph type="ital">(.*)<\/emph>/<i>$1<\/i>/ig;
+$title =~ s/<emph type="bld-ul">(.*)<\/emph>/<b><u>$1<\/u><\/b>/ig;
+$title =~ s/<emph type="bld-ital">(.*)<\/emph>/<b><i>$1<\/i><\/b>/ig;
+$title =~ s/<emph type="ital-ul">(.*)<\/emph>/<i><u>$1<\/u><\/i>/ig;
+$title =~ s/<emph type="bd-ul-it">(.*)<\/emph>/<b><u><i>$1<\/i><\/u><\/b>/ig;
+$title =~ s/emph>/b>/ig;
+$title =~ s/<[\/]?partname>//ig; # All legal tags which we don't need to keep
+$title =~ s/<[\/]?partno>//ig;
+$title =~ s/<[\/]?manufact>//ig;
+$title =~ s/<[\/]?product>//ig;
+$title =~ s/<[\/]?refdes>//ig;
+$title =~ s/<[\/]?callout>//ig;
+$title =~ s/<[\/]?faltcode>//ig;
+$title =~ s/<[\/]?brk>//ig;
+$title =~ s/<[\/]?xref>//ig;
+$title =~ s/<[\/]?txteqn>//ig;
+$title =~ s/<[\/]?ftnoteref>//ig;
+$title =~ s/<ftnote>.*<\/ftnote>//ig;
+$title =~ s/\&shy;//g;		# Some of the character entities used in titles
+$title =~ s/\&trade;/<sup>TM<\/sup>/g;
+$title =~ s/\&[a-z]dash;/-/g;
+$title =~ s/\&delta;/<i>d<\/i>/g;
+$title =~ s/\&Delta;/<i>D<\/i>/g;
+$title =~ s/\s+$//;
+$title =~ s/^\s+//;
+$title =~ s/\.+$//;
+if ($title eq "") {next;}		# If there was no title, go to next figure
+}
+my $gtag = <IN>;			# Read the next line, hopefully the <graphic...> tag;
+chop($gtag);
+$gtag =~ s/$//;	# Strip DOS delimiters which otherwise hang Perl
+if ($gtag =~ /<graphic filename="([^"]*)"/i) {
+$artfile = $1;
+$artfile =~ s/^[a-z0-9]\///;
+if ($artfile =~ /none/ || $artfile =~ /tbd\./ || $artfile =~ /test/) {next;}
+$entry = "$artfile|$title|$engine|$applic|" . &today . "\n";
+}
+else {next;}
+print TMP "$entry";
+}
+}
+close(IN);
+flock($arttemp, 8);            # Unlock the file
+close(TMP);
+}
+
+#-------------------------------------------------------
+# Function:     getgraphic
+# Arguments:    initial line to be added to
+# Description:  Read one or more lines until next <pitem>
+#               and concatenate them.
+# Example:      $long_line = &getgraphic($line);
+#-------------------------------------------------------
+
+sub getgraphic {
+local($line) = @_;
+chop($line);
+$line =~ s/$//;	# Strip DOS delimiters which otherwise hang Perl
+my $aline = '';
+while(1) {
+if ($aline =~ /[^>]$/) {$aline = join(' ', $aline, $line);}
+else {$aline = join('', $aline, $line);}
+if ($line =~ /<\/title>$/i) {return($aline);}
+$line = <IN>;
+if ($line =~ /<graphic/i) {return "";}	# If there is no title, you'll read "<graphic"
+chop($line);
+$line =~ s/$//;	# Strip DOS delimiters which otherwise hang Perl
+$line =~ s/<\?[^>.]*>//;
+}
+}
+
+#-------------------------------------------------------
+# Function:     getline
+# Arguments:    initial line to be added to
+# Description:  Read one or more lines until next closing
+#               tag character, concatenating them.
+# Example:      $long_line = &getline($line);
+#-------------------------------------------------------
+
+sub getline {
+local($line) = @_;
+chop($line);
+$line =~ s/$//;	# Strip DOS delimiters which otherwise hang Perl
+my $aline = '';
+while(1) {
+$aline = join(' ', $aline, $line);
+if ($line =~ />$/) {return($aline);}
+$line = <IN>;
+chop($line);
+$line =~ s/$//;	# Strip DOS delimiters which otherwise hang Perl
+$line =~ s/<\?Pub[^>]*>//;
+}
+}
+
+#-----------------------------------------------------
+#     Function Name     - CopyFile
+#     Description       - copy the input file to the output file
+#     Arguments         -
+#       input           - the input file
+#       output          - the output file
+#     Return Value      -
+#       1               - the file was copied successfully
+#       0               - the file was not copied successfully
+#-----------------------------------------------------
+
+sub CopyFile {
+
+local($input, $output) = @_;
+local($entry, $result);
+
+if (!open(IN, "<$input")) {
+print "<P><B>COULD NOT OPEN INPUT FILE:  $input </B></P>";
+$result = 0;
+}
+elsif (!open(OUT, ">$output")) {
+print "<P><B>COULD NOT OPEN OUTPUT FILE: $output </B></P>";
+close(IN);
+$result = 0;
+}
+else {
+while ($entry = <IN>) {print OUT $entry;}
+close(IN);
+close(OUT);
+chmod(0666, $output);
+$result = 1;
+}
+return($result);
+}
+
+#----------------------------------------------------------
+# Function      -  today
+# Description   -  Return today's date as: mm/dd/yyyy
+#
+# Example       -  $date = &today;
+#----------------------------------------------------------
+
+sub today {
+@now = localtime(time);
+my $mon = $now[4] + 1;
+my $yer = $now[5] + 1900;
+return("$mon/$now[3]/$yer");
+}
