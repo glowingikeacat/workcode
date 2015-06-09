@@ -1,0 +1,166 @@
+#!/usr2/apl/Perl/bin/perl
+#--------------------------------------------------------------
+# Script for input of doc library data. It parses the data posted
+# from the forms and appends it to the flat ASCII database,
+# where fields are separated with vertical bars. At user's
+# request, the database is sorted with duplicate removal, or
+# it the backup file is copied on top of the current database
+# as a form of roll back.
+#
+# Created by GVGouzev (D238, 505-8418)
+#--------------------------------------------------------------
+# Initalization and setup
+require '/usr2/apl/iplanet/servers/cgi-bin/cgi-lib.pl';
+$dbfile = '/usr2/apl/iplanet/servers/cgi-bin/tid/manuals.txt';
+$dbtemp = '/usr2/apl/iplanet/servers/cgi-bin/tid/manuals.bkp';
+
+# Parse the input or complain and exit
+if (&ReadParse(*input)) {
+
+# Send the magic string and the desired header
+print "Content-type: text/html\n\n",
+'<HTML><HEAD><TITLE>MAINTENANCE PAGE</TITLE></HEAD><BODY BGCOLOR="#FFFFFF">', "\n";
+
+&ProcessInput;
+
+} else {print &PrintHeader, '<CENTER><B>INPUT COULD NOT BE PARSED!</B></CENTER>';}
+
+print '<HR SIZE="1"><CENTER>[<A HREF="javascript:history.go(-1)">Back</A>] ', "\n",
+'[<A HREF="http://solarweb2.solar.cat.com/tid/">TID Home</A>] ', "\n",
+'[<A HREF="http://psoweb.solar.cat.com/">PSO Home</A>]<BR>', "\n",
+'<A HREF="http://solarweb.solar.cat.com/corp/legal-no.htm"><SMALL>Copyright © Solar Turbines Incorporated. ', "\n",
+'All rights reserved.</SMALL></A></CENTER></BODY></HTML>';
+exit 0;
+
+#--------------------------------------------------------------
+# Function	-  ProcessInput
+# Description	-  Processes the %input array as a switch and fires
+#                  up various functions, depending on which variables
+#                  were passed in. Contains a lot of pathnames and
+#                  values, specific to the current setup.
+# Arguments	-  None
+# Result	-  Returns the status of the last executed
+#                  statement
+#--------------------------------------------------------------
+
+sub ProcessInput {
+
+# The data addition part fires only if all of the info is present
+if ($input{'sonam'} && $input{'sonum'} && $input{'engine'} && $input{'applic'} &&
+$input{'driven'} && $input{'fuel'} && $input{'start'}) {
+
+flock("$dbtemp", 2);    # Lock for heavy usage!
+open(TMP, ">>$dbtemp");
+print TMP &toUpper($input{'sonam'}), "|",  &toLower($input{'sonum'}), "|$input{'engine'}|$input{'applic'}|$input{'driven'}|$input{'fuel'}|$input{'start'}|";
+
+if ($input{'other'}) {print TMP "$input{'other'}|", &today, "\n";}
+else {print TMP "--|", &today, "\n";}
+
+close TMP;
+print "<P><B> ADDED $input{'sonum'}, $input{'sonam'} TO THE BUFFER...</B></P>\n",
+'<P><B> YOU MUST SAVE THE CHANGES TO ENACT THESE ADDITIONS OR ROLL BACK TO ESCAPE THIS EDIT</B></P>', "\n";
+}
+
+# Save uses the shell sort in the dictionary order with unique output
+elsif ($input{'save'}) {
+system "/bin/sort -u -o $dbtemp -d $dbtemp";
+flock("$dbtemp", 8);    # Unlock
+&CopyFile($dbtemp, '/usr5/partsb/pub/d238/trans/homepage/manuals.txt');
+if (&CopyFile($dbtemp, $dbfile)) {
+print '<CENTER><B> DATABASE SUCCESSFULLY UPDATED AND SAVED...</B></CENTER>';
+}
+}
+
+# Roll back function copies the current DB onto the working file to obliterate changes
+elsif ($input{'rollback'}) {
+if (&CopyFile($dbfile, $dbtemp)) {
+print '<CENTER><B> ROLLED BACK THE DATABASE SUCCESSFULLY ...</B></CENTER>';
+}
+}
+
+# If none of the arguments match, the user must have submitted insufficient data
+else {print '<CENTER><B> YOU MAY HAVE INPUT INSUFFICIENT DATA. PLEASE TRY AGAIN...</B></CENTER>';}
+}
+
+#-----------------------------------------------------
+#     Function Name     - CopyFile
+#     Description       - copy the input file to the output file
+#     Arguments         -
+#       input           - the input file
+#       output          - the output file
+#
+#     Return Value      -
+#       1               - the file was copied successfully
+#       0               - the file was not copied successfully
+#
+#     Example call      - $result = copy($input, $output);
+#-----------------------------------------------------
+
+sub CopyFile {
+
+local($input, $output) = @_;
+local($entry, $result);
+
+if (!open(IN, "<$input")) {
+print "<p><b>COULD NOT OPEN INPUT FILE:  $input </b></p>";
+$result = 0;
+}
+elsif (!open(OUT, ">$output")) {
+print "<p><b>COULD NOT OPEN OUTPUT FILE: $output </b></p>";
+close(IN);
+$result = 0;
+}
+else {
+while ($entry = <IN>) {print OUT $entry;}
+close(IN);
+close(OUT);
+chmod(0666, $output);
+$result = 1;
+}
+return($result);
+}
+
+#----------------------------------------------------------
+# Function      -  toUpper
+# Description   -  Return a string with the alphabetic
+#                  characters translated to upper case.
+# Arguments     -  Input string
+# Result        -  Translated upper case string
+# Example       -  $string = &toUpper('This is a string.');
+#----------------------------------------------------------
+
+sub toUpper {
+local($value) = @_;
+$value =~ tr/a-z/A-Z/;
+return($value);
+}
+
+
+#----------------------------------------------------------
+# Function      -  toLower
+# Description   -  Return a string with the alphabetic
+#                  characters translated to lower case.
+# Arguments     -  Input string
+# Result        -  Translated lower case string
+# Example       -  $string = &toLower('This is a string.');
+#----------------------------------------------------------
+
+sub toLower {
+local($value) = @_;
+$value =~ tr/A-Z/a-z/;
+return($value);
+}
+#----------------------------------------------------------
+# Function      -  today
+# Description   -  Return today's date as: mm/dd/yyyy
+#
+# Example       -  $date = &today;
+#----------------------------------------------------------
+
+sub today {
+@now = localtime(time);
+my $mon = $now[4] + 1;
+my $yer = $now[5] + 1900;
+return("$mon/$now[3]/$yer");
+}
+
