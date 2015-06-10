@@ -133,6 +133,8 @@ sub StdFeatures {
 
 local ($pdnum) = uc($input{'pd'});
 
+print "\n\n<B>STANDARD FEATURES FOR PD NUMBER $pdnum</B>\n";
+
 # Open the query and execute it
 if (open(QRY,"sqlplus -s techpubs/t4r4ngp0dc4st\@pds \@$basedir/$aquery \"$pdnum\" |")) {
 while (<QRY>) {
