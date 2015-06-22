@@ -1,0 +1,111 @@
+#!/usr6/aplb/Perl/bin/perl
+#--------------------------------------------------------------
+# File:    ulink
+# Project: new authoring
+# Purpose: creates entries in the IMI file that will allow PDF links to VDATA pdf files
+# Syntax:  ulink <file name>
+# Author:  Dmitry Yekhilevsky
+# Date:    05/06/04
+#---------------------------------------------------------------
+# Check for sufficient arguments, set up variables
+local (@dicdata, @ardata, $i, $count, $iplfile, $sdfile );
+local ($item1, $item2) = ""; 
+
+$imifile = $ARGV[0];		# file argument
+
+$i=0;
+
+if (@ARGV < 1) {die "\nUSAGE: ulink <file name>\n";}
+else {
+  if (!open (IN, "<$imifile ")) {die "\nCould not open $imifile. Exiting...\n";}
+
+&ParseIMIFile;
+
+}
+exit 0;
+#--------------------------------------------------------------
+# Function:     ParseIMIFile
+# Arguments:    none
+# Description:  Reads the input file line-by-line, adding the 
+#		the missing lines until the entire <vref> is
+#		assembled. Then the part pull number is 
+#		extracted, ulink tag is built, and line is re-written.
+# Example:	&ParseIPLFile;
+#--------------------------------------------------------------
+
+sub ParseIMIFile {
+    local ($line, $line2, $imiline, $sdline, $pnum, $pnumipl, $pullnum, @result, $res, $erefaddr);
+
+    open (OUT, ">output.sgm");
+    while ($line = <IN>) {
+    	if ($line =~ /\<vref/) {
+	  if (!($line =~ /\<\/vref/)) {
+	    chomp($line);
+	    $aline = <IN>;
+	    $line = join(' ', $line, $aline);
+	  }
+		
+          if ($line =~ /<vref pullno\=\"(.*)\"\>/) {
+	    $pullnum = $1;
+	    $line =~ s/$pullnum\"\>/$pullnum\"\>\<ulink url\=\"\.\/vdata\/$pullnum\.pdf\"\>/;
+	    $line =~ s/\<\/vref\>/\<\/ulink\>\<\/vref\>/g;
+          }
+	}
+
+    	if ($line =~ /\<eref/) {
+	  if (!($line =~ /\<\/eref/)) {
+	    chomp($line);
+	    $aline = <IN>;
+	    $line = join(' ', $line, $aline);
+	  }
+		
+          if ($line =~ /<eref docno\=\"\/pub\/eref-lib\/[a-z0-9]\/(.*)\"\>/) {
+	    $erefaddr = $1;
+#	    $erefaddr =~ s/\//\//g;
+	    $line =~ s/$erefaddr\"\>/$erefaddr\"\>\<ulink url\=\"\.\/vdata\/$erefaddr\"\>/;
+	    $line =~ s/\<\/eref\>/\<\/ulink\>\<\/eref\>/g;
+          }
+        }
+      print OUT "$line";
+    }
+
+
+   close OUT;
+   close IN;
+
+ $imifile =~ s/\.sgm//;
+ $imifile =~ s/\.sgml//;
+
+system "cp output.sgm $imifile\_tagged.sgm";
+ system "rm output.sgm";
+
+ 
+ system "chmod 666 $imifile\_tagged.sgm";
+}
+
+#-------------------------------------------------------
+# Function:     getline
+# Arguments:    initial line to be added to
+# Description:  Read one or more lines until next <pitem> 
+#		and concatenate them.
+# Example:	$long_line = &getline($line);
+#-------------------------------------------------------
+ 
+sub getline {
+print "IN GETLINE";
+
+   local($line) = @_;
+print "Getline line=" . $line;
+   chop($line);
+   $aline = '';
+   while(1) {
+      if ($aline =~ /[^>]$/) {$aline = join(' ', $aline, $line);}
+      else {$aline = join('', $aline, $line);}
+print "aline=" . $aline;
+print "line=" . $line;
+
+      if ($line =~ /<\/vref>$/) {return("$aline\n")}
+      $line = <IN>;
+      chop($line);
+   }
+}
