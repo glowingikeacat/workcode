@@ -1,0 +1,215 @@
+#!/bin/csh -f
+ 
+# Analyzes the SGML file for presence of translated art and 
+# substitutes art file names with their translations.
+#
+# Created by GVGouzev (505-8418)
+# Date: 4/3/00
+# Changes: 
+#			1152013 | Added the Azeri option | A.Cordero
+#                      07102013 | Added Polish option    | A.Cordero
+#                      15102013 | Added Slovenian option | A.Cordero
+#                      23102013 | Added Croatian option  | A.Cordero
+#------------------------------------------------------------
+# If no arguments, tell how to use:
+
+echo ''
+
+if ($#argv < 1) then
+        echo 'USAGE: transart <SGML monolithic file name>'
+        exit 0
+endif
+
+#---------------------------------------------------------------------
+# Ask for the desired language
+ 
+menu1_top:
+  echo ''
+  echo '   Language Selection Menu:'
+  echo ''
+  echo '  1 Czech       2 Danish     3 Dutch     4 English    5 Finnish'
+  echo '  6 French      7 German     8 Greek     9 Italian   10 Norwegian'
+  echo ' 11 Portuguese 12 Russian   13 Slovak   14 Spanish   15 Swedish'
+  echo ' 16 Bulgarian  17 Hungarian 18 Portuguese(Brazil)    19 Azeri'
+  echo ' 20 Polish     21 Slovenian 22 Croatian'
+ 
+ echo ''
+  echo -n 'Enter choice number or q to quit: '
+set lan = $<
+ 
+if ($lan == '1') then
+   set lang = 'cs'
+   set code = 'c'
+else if ($lan == '2') then
+   set lang = 'da'
+   set code = 'a'
+else if ($lan == '3') then
+   set lang = 'nl'
+   set code = 'd'
+else if ($lan == '4') then
+   set lang = 'en'
+   set code = ''
+else if ($lan == '5') then
+   set lang = 'fi'
+   set code = 'h'
+else if ($lan == '6') then
+   set lang = 'fr'
+   set code = 'f'
+else if ($lan == '7') then
+   set lang = 'de'
+   set code = 'g'
+else if ($lan == '8') then
+   set lang = 'el'
+   set code = 'k'
+else if ($lan == '9') then
+   set lang = 'it'
+   set code = 'i'
+else if ($lan == '10') then
+   set lang = 'no'
+   set code = 'n'
+else if ($lan == '11') then
+   set lang = 'pt'
+   set code = 'p'
+else if ($lan == '12') then
+   set lang = 'ru'
+   set code = 'r'
+else if ($lan == '13') then
+   set lang = 'sk'
+   set code = ''
+else if ($lan == '14') then
+   set lang = 'es'
+   set code = 's'
+else if ($lan == '15') then
+   set lang = 'sv'
+   set code = 'w'
+else if ($lan == '16') then
+   set lang = 'bg'
+   set code = 'l'
+else if ($lan == '17') then
+   set lang = 'hu'
+   set code = 'u'
+else if ($lan == '18') then
+   set lang = 'ptb'
+   set code = 'p'
+else if ($lan == '19') then
+   set lang = 'az'
+   set code = 'z'   
+else if ($lan == '20') then
+   set lang = 'pl'
+   set code = ''
+else if ($lan == '21') then
+   set lang = 'sl'
+   set code = 'sn'
+else if ($lan == '22') then
+   set lang = 'hr'
+   set code = 'hr'
+else if ($lan == 'q') then
+   echo 'BYE...'
+   exit 0
+else
+   echo 'YOU HAVE ENTERED A BAD CHOICE, PLEASE TRY AGAIN...'
+   goto menu1_top
+endif
+
+#------------------------------------------------------------
+# Go through the art list, looking for translated matches:
+
+set dq = '"'
+set art = '/usr5/partsb/pub/art-lib'
+set basename=`echo $argv[1] | awk -F'/' '{print $NF}' | awk -F\. '{print $1}'`
+/bin/rm -f /tmp/$basename.sed && touch /tmp/$basename.sed
+
+echo ''
+echo 'TRANSLATED TIFF FILES:'
+foreach image (`grep '<graphic filename=".*\.pg' $argv[1] | awk -F$dq '{print $2}'`)
+        set imagecore=`echo $image | awk -F\. '{print $1}'`
+        set pathdepth=`echo $imagecore | grep -c '[a-z0-9]/[a-z0-9]'`
+        if ($pathdepth == 0) then
+                set imagedir=`echo $imagecore | cut -c 1`
+                set imagebase="$imagedir/$imagecore"
+        else
+                set imagebase="$imagecore"
+        endif
+
+	if (-e $art/$imagebase.pg$code) then
+		echo "$imagebase.pg$code"
+		echo "s|$image|$imagebase.pg$code|" >> /tmp/$basename.sed
+# DY added to look for image$lang.tif if doesn't find .pg$code
+	else if (-e $art/$imagebase$lang.tif) then
+ 	     	echo "$imagebase$lang.tif"
+  	     	echo "s|$image|$imagebase$lang.tif|" >> /tmp/$basename.sed
+	endif
+end
+
+foreach image (`grep '<graphic filename=".*\.tif' $argv[1] | awk -F$dq '{print $2}'`)
+        set imagecore=`echo $image | awk -F\. '{print $1}'`
+        set pathdepth=`echo $imagecore | grep -c '[a-z0-9]/[a-z0-9]'`
+        if ($pathdepth == 0) then
+                set imagedir=`echo $imagecore | cut -c 1`
+                set imagebase="$imagedir/$imagecore"
+        else
+                set imagebase="$imagecore"
+        endif
+
+	if (-e $art/$imagebase$lang.tif) then
+		echo "$imagebase$lang.tif"
+		echo "s|$image|$imagebase$lang.tif|" >> /tmp/$basename.sed
+	endif
+end
+
+echo ''
+echo 'TRANSLATED CGM FILES:'
+foreach image (`grep '<graphic filename=".*\.cgm' $argv[1] | awk -F$dq '{print $2}'`)
+        set imagecore=`echo $image | awk -F\. '{print $1}'`
+        set pathdepth=`echo $imagecore | grep -c '[a-z0-9]/[a-z0-9]'`
+        if ($pathdepth == 0) then
+                set imagedir=`echo $imagecore | cut -c 1`
+                set imagebase="$imagedir/$imagecore"
+        else
+                set imagebase="$imagecore"
+        endif
+
+	if (-e $art/$imagebase$lang.cgm) then
+		echo "$imagebase$lang.cgm"
+		echo "s|$image|$imagebase$lang.cgm|" >> /tmp/$basename.sed
+	endif
+
+ 
+        if (-e $art/$imagebase$lang.tif) then
+                echo "$imagebase$lang.tif"
+                echo "s|$image|$imagebase$lang.tif|" >> /tmp/$basename.sed
+        endif
+
+end
+
+echo ''
+echo 'TRANSLATED JPEG FILES:'
+foreach image (`grep '<graphic filename=".*\.jpg' $argv[1] | awk -F$dq '{print $2}'`)
+        set imagecore=`echo $image | awk -F\. '{print $1}'`
+        set pathdepth=`echo $imagecore | grep -c '[a-z0-9]/[a-z0-9]'`
+        if ($pathdepth == 0) then
+                set imagedir=`echo $imagecore | cut -c 1`
+                set imagebase="$imagedir/$imagecore"
+        else
+                set imagebase="$imagecore"
+        endif
+
+	if (-e $art/$imagebase$lang.jpg) then
+		echo "$imagebase$lang.jpg"
+		echo "s|$image|$imagebase$lang.jpg|" >> /tmp/$basename.sed
+	endif
+end
+
+#------------------------------------------------------------
+# Sort the SED script onto itself to remove duplicates and apply it:
+
+echo ''
+echo 'PERFORMING SUBSTITUTIONS. PLEASE WAIT...'
+
+sort -u -o /tmp/$basename.sed /tmp/$basename.sed
+cp $argv[1] $argv[1].bkp && chmod 666 $argv[1].bkp
+cat $argv[1] | sed -f /tmp/$basename.sed >! /tmp/$basename.TmP && mv /tmp/$basename.TmP $argv[1]
+/bin/rm -f /tmp/$basename.sed
+echo "DONE. BACKUP FILE $argv[1].bkp WAS CREATED. USE IT TO ROLL BACK THE CHANGES OR REMOVE IT."
+
+exit 0
