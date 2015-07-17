@@ -1,0 +1,25 @@
+LOCATION OF RESORE MATERIAL:
+/auto/usr5/partsb/pub/d238/production/dbaserestore
+
+RESTORE THE DATABASE:
+1. get a listing of files in the database.
+2. get a listing of files in the directory.
+3. compare.
+
+LOCATION OF HTML CDs
+/auto/usr5/partsb/pub/pub-lib
+
+Change to the directory that prefixes the number of the project. For 3U111, change to the directoy, "3".
+
+EXAMPLE OF DATABASE ENTRY:
+BERA-60|3j841|Taurus 60|GS|kato|Dual Fuel|AC Direct Drive|Enclosure, Package|6/16/2011
+
+GREP COMMANDS:
+grep -c '[3][a-z]' manuals.txt - This command returns all entries that start with a 3 and have a letter following.
+
+grep '[3][a-z]' manuals.txt>/auto/usr5/partsb/pub/d238/production/dbaserestore/three-pd.txt
+
+
+AWK COMMANDS:
+awk '{print $9}' directories-3.txt - will extract the ninth column of the textfile
+awk '{print $2}' dbase-3.txt
