@@ -1,0 +1,40 @@
+New connections will be remembered.
+
+
+Status       Local     Remote                    Network
+
+-------------------------------------------------------------------------------
+OK           G:        \\f3link01.solar.cat.com\apps 
+                                                Microsoft Windows Network
+OK           H:        \\kmfs2\usr5\partsb\pub\art-lib 
+                                                Microsoft Windows Network
+OK           I:        \\kmfs2\usr6\aplb\adept-apps\support_files 
+                                                Microsoft Windows Network
+OK           J:        \\kmfs2\usr5\partsb\pub\d238\production 
+                                                Microsoft Windows Network
+OK           M:        \\f3link01.solar.cat.com\Users\d44399m 
+                                                Microsoft Windows Network
+OK           N:        \\kmfs2\usr5\partsb\pub\pub-lib\cd-rom 
+                                                Microsoft Windows Network
+OK           O:        \\kmfs2\usr6              Microsoft Windows Network
+OK           P:        \\hdfs2\usr7\apl\iplanet\servers\docs\tid\digital 
+                                                Microsoft Windows Network
+OK           Q:        \\kmfs2\usr5\partsb\pub\d712 
+                                                Microsoft Windows Network
+OK           R:        \\f3mars.solar.cat.com\vol2\control_proj 
+                                                Microsoft Windows Network
+             S:        \\link.solar.cat.com\share 
+                                                Microsoft Windows Network
+OK           U:        \\kmfs2\usr5\partsb\pub\pub-lib 
+                                                Microsoft Windows Network
+OK           V:        \\kmfs2\usr5\partsb\pub\d238\trans 
+                                                Microsoft Windows Network
+OK           W:        \\kmfs2\usr6\aplb\adept-apps 
+                                                Microsoft Windows Network
+OK           X:        \\kmfs2\usr5\partsb\pub   Microsoft Windows Network
+OK           Y:        \\kmfs2\usr5\partsb\pub\d712 
+                                                Microsoft Windows Network
+OK           Z:        \\kmfs2\usr5\partsb\pub\d238.ileaf\production\datapkg 
+                                                Microsoft Windows Network
+The command completed successfully.
+
