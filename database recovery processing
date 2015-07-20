@@ -7,7 +7,7 @@ DIRECTORY LISTING PROCESSING:
 5. sed 's/\///g' dirnum.txt #removes forward slash
 
 DATABASE LISTING PROCESSING
-awk -F "|" '{print $2}' database #extracts the PD number only
+awk -F'|' '{print $2}' database #extracts the PD number only
 
 COMPARE:
 diff database_numbers_only.txt en_only_directories_no.txt|grep '>'>add_these_to_the_database.txt
