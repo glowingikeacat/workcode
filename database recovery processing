@@ -4,7 +4,7 @@
 DIRECTORY LISTING PROCESSING:
 3. awk '{print $9}' #prints the ninth column
 4. grep -v "[a-z]\/" #returns only the English directories
-5. Remove forward slash
+5. sed 's/\///g' dirnum.txt #removes forward slash
 
 DATABASE LISTING PROCESSING
 awk -F "|" '{print $2}' database #extracts the PD number only
