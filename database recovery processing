@@ -8,6 +8,7 @@ DIRECTORY LISTING PROCESSING:
 
 DATABASE LISTING PROCESSING
 awk -F'|' '{print $2}' database #extracts the PD number only
+find . -maxdepth 2 -type f | awk -F/ '{print $3}' #prints all the directories
 
 COMPARE:
 diff database_numbers_only.txt en_only_directories_no.txt|grep '>'>add_these_to_the_database.txt
